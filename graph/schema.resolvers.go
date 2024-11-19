@@ -33,7 +33,13 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, name string, descr
 		CategoryID: uint(id),
 	}
 
-	if err := r.DB.WithContext(ctx).Create(newProduct).Error; err != nil {
+	// validation category
+	var existingCategory domain.Category
+	if err := r.DB.WithContext(ctx).First(&existingCategory, id).Error; err != nil {
+		return nil, fmt.Errorf("category with ID %s does not exist", categoryID)
+	}
+
+	if err := r.DB.WithContext(ctx).Create(&newProduct).Error; err != nil {
 		return nil, fmt.Errorf("failed to create product: %v", err)
 	}
 
@@ -53,13 +59,13 @@ func (r *mutationResolver) CreateCategory(ctx context.Context, name string) (*mo
 		Name: name,
 	}
 
-	if err := r.DB.WithContext(ctx).Create(newCategory).Error; err != nil {
+	if err := r.DB.WithContext(ctx).Create(&newCategory).Error; err != nil {
 		return nil, fmt.Errorf("failed to create new category %v", err)
 	}
 
 	return &model.Category{
 		ID:   strconv.Itoa(int(newCategory.ID)),
-		Name: "",
+		Name: newCategory.Name,
 	}, nil
 
 }
