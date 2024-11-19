@@ -6,7 +6,9 @@ package graph
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"koriebruh/graphql-product/domain"
 	"koriebruh/graphql-product/graph/model"
 	"strconv"
@@ -40,7 +42,7 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, name string, descr
 		Name:        newProduct.Name,
 		Description: description,
 		Price:       newProduct.Price,
-		Category:    &model.Category{ID: fmt.Sprint(newProduct.CategoryID)}, // Sesuaikan sesuai kebutuhan
+		Category:    &model.Category{ID: fmt.Sprint(newProduct.CategoryID)},
 	}, nil
 
 }
@@ -64,22 +66,96 @@ func (r *mutationResolver) CreateCategory(ctx context.Context, name string) (*mo
 
 // Products is the resolver for the products field.
 func (r *queryResolver) Products(ctx context.Context) ([]*model.Product, error) {
-	panic(fmt.Errorf("not implemented: Products - products"))
+	var dataProduct []domain.Product
+	if err := r.DB.WithContext(ctx).Find(&dataProduct).Error; err != nil {
+		return nil, fmt.Errorf("failed to get field product")
+	}
+
+	// mapping data from db
+	var products []*model.Product
+	for _, p := range dataProduct {
+		products = append(products, &model.Product{
+			ID:          fmt.Sprint(p.ID),
+			Name:        p.Name,
+			Description: &p.Description,
+			Price:       p.Price,
+			Category:    &model.Category{ID: fmt.Sprint(p.CategoryID)},
+		})
+
+	}
+
+	return products, nil
+
 }
 
 // Product is the resolver for the product field.
 func (r *queryResolver) Product(ctx context.Context, id string) (*model.Product, error) {
-	panic(fmt.Errorf("not implemented: Product - product"))
+	var product *domain.Product
+
+	productID, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid product ID: %v", err)
+	}
+
+	if err = r.DB.WithContext(ctx).Find(&product, uint(productID)).Error; err != nil {
+		// check if data no exist
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("product not found")
+		}
+		return nil, fmt.Errorf("failed to fetch product: %v", err)
+	}
+
+	return &model.Product{
+		ID:          fmt.Sprint(product.ID),
+		Name:        product.Name,
+		Description: &product.Description,
+		Price:       product.Price,
+		Category:    &model.Category{ID: fmt.Sprint(product.CategoryID)},
+	}, nil
+
 }
 
 // Categories is the resolver for the categories field.
 func (r *queryResolver) Categories(ctx context.Context) ([]*model.Category, error) {
-	panic(fmt.Errorf("not implemented: Categories - categories"))
+	var categoriesDB []*domain.Category
+
+	if err := r.DB.WithContext(ctx).Find(&categoriesDB).Error; err != nil {
+		return nil, fmt.Errorf("failed to get field category")
+	}
+
+	var categories []*model.Category
+	for _, category := range categoriesDB {
+		categories = append(categories, &model.Category{
+			ID:   fmt.Sprint(category.ID),
+			Name: category.Name,
+		})
+	}
+
+	return categories, nil
+
 }
 
 // Category is the resolver for the category field.
 func (r *queryResolver) Category(ctx context.Context, id string) (*model.Category, error) {
-	panic(fmt.Errorf("not implemented: Category - category"))
+	var category domain.Category
+
+	categoryID, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid product ID: %v", err)
+	}
+
+	if err = r.DB.WithContext(ctx).Find(&category, uint(categoryID)).Error; err != nil {
+		// check if data no exist
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("product not found")
+		}
+		return nil, fmt.Errorf("failed to fetch product: %v", err)
+	}
+
+	return &model.Category{
+		ID:   fmt.Sprint(category.ID),
+		Name: category.Name,
+	}, nil
 }
 
 // Mutation returns MutationResolver implementation.
